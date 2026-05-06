@@ -220,7 +220,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 				llm = ChatBrowserUse()
 
 		# set flashmode = True if llm is ChatBrowserUse
-		if llm.provider == 'browser-use':
+		if getattr(llm, 'provider', None) == 'browser-use':
 			flash_mode = True
 
 		# Auto-configure llm_screenshot_size for Claude Sonnet models
