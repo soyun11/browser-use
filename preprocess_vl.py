@@ -29,6 +29,12 @@ MODEL_DIRS = {
         "./trajectories_vl_gemini",
         "./cert_trajectories_vl_gemini",
     ],
+    "gemini_library": [
+        "./trajectories_vl_gemini",
+    ],
+    "gemini_cert": [
+        "./cert_trajectories_vl_gemini",
+    ],
 }
 
 # training_data_vl.jsonl 경로 (이미지 포함 raw 데이터)
@@ -36,6 +42,8 @@ TRAINING_DATA_DIRS = {
     "bu": "./data/training_data_vl.jsonl",
     "gpt": "./data/training_data_vl_gpt.jsonl",
     "gemini": "./data/training_data_vl_gemini.jsonl",
+    "gemini_library": "./data/training_data_vl_gemini_library.jsonl",
+    "gemini_cert": "./data/training_data_vl_gemini_cert.jsonl",
 }
 
 # ──────────────────────────────────────────
@@ -474,6 +482,23 @@ def preprocess_from_jsonl(training_data_path: str, output_path: str) -> dict:
 			trajectories.append(current)
 		return trajectories
 
+	# 학습에서 제외할 액션 타입
+	SKIP_ACTION_TYPES = {"replace_file", "read_file", "evaluate", "write_file"}
+
+	def _should_skip_step(actions: list) -> bool:
+		if not actions:
+			return False
+		def get_action_type(a):
+			if isinstance(a, dict):
+				if "type" in a:
+					return a["type"]
+				return list(a.keys())[0] if a else None
+			return None
+		return all(
+			get_action_type(a) in SKIP_ACTION_TYPES
+			for a in actions
+		)
+
 	def _build_conversation(traj_steps: list[dict], task: str) -> list[dict]:
 		meaningful_flags = _compute_meaningful_flags(traj_steps)
 		messages: list[dict] = [
@@ -483,6 +508,16 @@ def preprocess_from_jsonl(training_data_path: str, output_path: str) -> dict:
 		for i, step in enumerate(traj_steps):
 			# assistant: done action의 success 강제 True
 			actions = step["output"].get("action", [])
+
+			# replace_file, read_file, evaluate, write_file 액션만 제거
+			SKIP = {"replace_file", "read_file", "evaluate", "write_file"}
+			def _get_type(a):
+				if "type" in a: return a["type"]
+				return list(a.keys())[0] if a else None
+			actions = [a for a in actions if _get_type(a) not in SKIP]
+			if not actions:
+				continue
+
 			fixed_actions = []
 			for a in actions:
 				if isinstance(a, dict) and "done" in a:
@@ -570,7 +605,7 @@ def preprocess_from_jsonl(training_data_path: str, output_path: str) -> dict:
 # ──────────────────────────────────────────
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", choices=["bu", "gpt", "gemini", "all"], default="bu")
+    parser.add_argument("--model", choices=["bu", "gpt", "gemini", "gemini_library", "gemini_cert", "all"], default="bu")
     parser.add_argument("--output", type=str, default=None, help="출력 파일 경로 (기본값: ./data/ft_train_vl_{model}_v2.jsonl)")
     parser.add_argument("--from-jsonl", action="store_true", help="trajectory 폴더 대신 training_data_vl.jsonl에서 직접 생성")
     args = parser.parse_args()
