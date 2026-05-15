@@ -510,7 +510,7 @@ def preprocess_from_jsonl(training_data_path: str, output_path: str) -> dict:
 			actions = step["output"].get("action", [])
 
 			# replace_file, read_file, evaluate, write_file 액션만 제거
-			SKIP = {"replace_file", "read_file", "evaluate", "write_file"}
+			SKIP = {"replace_file", "read_file", "evaluate", "write_file", "extract"}
 			def _get_type(a):
 				if "type" in a: return a["type"]
 				return list(a.keys())[0] if a else None
